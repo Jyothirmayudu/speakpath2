@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SpeakPath — Learn Spoken English</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<!-- ===================== LOGIN VIEW ===================== -->
+<div id="view-login">
+  <div class="login-card">
+    <div class="login-mark">S</div>
+    <h1>Welcome to SpeakPath</h1>
+    <p class="sub">A simple, self-paced way to build spoken English confidence, one concept at a time — Level 1 through Level 4.</p>
+    <label class="field-label" for="name-input">What should we call you?</label>
+    <input class="text-input" id="name-input" type="text" placeholder="e.g. Jyo" maxlength="30" />
+    <button class="btn btn-primary" id="login-btn">Start learning</button>
+    <p class="note-line">This just saves your progress in this browser on this computer — no account, no server, nothing leaves your machine.</p>
+  </div>
+</div>
+
+<!-- ===================== APP SHELL (everything after login) ===================== -->
+<div id="app-shell" class="hidden">
+  <div class="topbar">
+    <div class="brand">
+      <span class="brand-mark">S</span>
+      <span class="brand-name">SpeakPath</span>
+    </div>
+    <div class="topbar-right">
+      <div class="user-chip">
+        <span class="avatar" id="avatar-letter">J</span>
+        <span id="greet-name">Jyo</span>
+      </div>
+      <button class="link-btn" id="logout-btn">Switch user</button>
+    </div>
+  </div>
+
+  <div class="shell">
+
+    <!-- ---------- DASHBOARD ---------- -->
+    <div id="view-dashboard">
+      <div class="dash-head">
+        <h1>Welcome back, <span id="dash-name">there</span></h1>
+        <p>Here's where your spoken English practice stands today.</p>
+      </div>
+
+      <div class="stat-row">
+        <div class="stat-card">
+          <div class="stat-num" id="stat-concepts">0/28</div>
+          <div class="stat-label">Concepts covered so far</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-num" id="stat-levels">0/4</div>
+          <div class="stat-label">Levels completed</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-num" id="stat-next">Level 1</div>
+          <div class="stat-label">Recommended next step</div>
+        </div>
+      </div>
+
+      <h2 class="section-title">Your levels</h2>
+      <div class="level-grid" id="level-grid"></div>
+    </div>
+
+    <!-- ---------- LEVEL DETAIL ---------- -->
+    <div id="view-level" class="hidden">
+      <div class="back-row">
+        <button class="back-link" onclick="goDashboard()">← Back to dashboard</button>
+      </div>
+      <div class="level-header">
+        <div class="lv-tag" id="lv-tag">LEVEL 1</div>
+        <h1 id="lv-title">Foundations for Speaking</h1>
+        <p id="lv-desc"></p>
+      </div>
+      <div class="concept-list" id="concept-list"></div>
+      <div class="quiz-cta-card">
+        <div>
+          <h3>Ready to test yourself?</h3>
+          <p id="quiz-cta-desc">A short quiz on everything in this level. Score 70% or higher to unlock the next level.</p>
+        </div>
+        <button class="btn btn-accent" id="start-quiz-btn">Take the quiz</button>
+      </div>
+    </div>
+
+    <!-- ---------- QUIZ ---------- -->
+    <div id="view-quiz" class="hidden">
+      <div class="quiz-wrap">
+        <div class="back-row">
+          <button class="back-link" onclick="goLevel(currentLevel)">← Back to level</button>
+        </div>
+        <div class="quiz-progress">
+          <span class="quiz-progress-label" id="quiz-progress-label">Question 1 of 7</span>
+          <div class="quiz-progress-track"><div class="quiz-progress-fill" id="quiz-progress-fill" style="width:14%"></div></div>
+        </div>
+        <div class="q-card">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:22px;flex-wrap:wrap;">
+            <p class="q-text" id="q-text"></p>
+            <span id="question-listen-slot"></span>
+          </div>
+          <div class="opt-list" id="opt-list"></div>
+          <div class="feedback-box hidden" id="feedback-box"></div>
+          <div class="quiz-actions">
+            <button class="btn btn-primary" id="quiz-next-btn" disabled>Check answer</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ---------- RESULTS ---------- -->
+    <div id="view-results" class="hidden">
+      <div class="result-wrap">
+        <div class="result-summary">
+          <div class="result-ring" id="result-ring">80%</div>
+          <h2 id="result-title">Nice work!</h2>
+          <p id="result-sub">You passed Level 1 and unlocked Level 2.</p>
+          <div class="result-actions">
+            <button class="btn btn-ghost" onclick="goLevel(currentLevel)">Review this level</button>
+            <button class="btn btn-primary" onclick="goDashboard()">Back to dashboard</button>
+          </div>
+        </div>
+        <div class="review-section">
+          <h2>Review your answers</h2>
+          <p class="review-sub">Every question, explained — use the player to listen, pause, drag through, or restart any explanation.</p>
+          <div id="review-list"></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script src="js/content.js"></script>
+<script src="js/speech.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
