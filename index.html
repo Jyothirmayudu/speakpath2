@@ -14,7 +14,14 @@
 <!-- ===================== LOGIN VIEW ===================== -->
 <div id="view-login">
   <div class="login-card">
-    <div class="login-mark">S</div>
+    <div class="login-mark">
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <rect x="2" y="8" width="3" height="8" rx="1.5" fill="white"/>
+        <rect x="8" y="4" width="3" height="16" rx="1.5" fill="white"/>
+        <rect x="14" y="6" width="3" height="12" rx="1.5" fill="white"/>
+        <rect x="20" y="9" width="3" height="6" rx="1.5" fill="white"/>
+      </svg>
+    </div>
     <h1>Welcome to SpeakPath</h1>
     <p class="sub">A simple, self-paced way to build spoken English confidence, one concept at a time — Level 1 through Level 4.</p>
     <label class="field-label" for="name-input">What should we call you?</label>
@@ -28,7 +35,14 @@
 <div id="app-shell" class="hidden">
   <div class="topbar">
     <div class="brand" id="brand-home-btn" role="button" tabindex="0" title="Go to dashboard">
-      <span class="brand-mark">S</span>
+      <span class="brand-mark">
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <rect x="2" y="8" width="3" height="8" rx="1.5" fill="white"/>
+          <rect x="8" y="4" width="3" height="16" rx="1.5" fill="white"/>
+          <rect x="14" y="6" width="3" height="12" rx="1.5" fill="white"/>
+          <rect x="20" y="9" width="3" height="6" rx="1.5" fill="white"/>
+        </svg>
+      </span>
       <span class="brand-name">SpeakPath</span>
     </div>
     <div class="topbar-right">
@@ -47,11 +61,17 @@
       <div class="dash-head">
         <h1>Welcome back, <span id="dash-name">there</span></h1>
         <p>Here's where your spoken English practice stands today.</p>
+        <div class="progress-file-row">
+          <button class="btn btn-ghost small-btn" id="export-progress-btn" type="button">⬇ Export progress (JSON)</button>
+          <button class="btn btn-ghost small-btn" id="import-progress-btn" type="button">⬆ Import progress (JSON)</button>
+          <input type="file" id="import-file-input" accept=".json,application/json" class="hidden">
+        </div>
+        <p class="progress-file-note">Your progress is saved automatically in this browser. Use Export to save a backup file you (or anyone) can open, edit, and re-import to update this student's tracked progress.</p>
       </div>
 
       <div class="stat-row">
         <div class="stat-card">
-          <div class="stat-num" id="stat-concepts">0/80</div>
+          <div class="stat-num" id="stat-concepts">0/96</div>
           <div class="stat-label">Concepts covered so far</div>
         </div>
         <div class="stat-card">
@@ -78,7 +98,7 @@
         <h1 id="lv-title">Foundations for Speaking</h1>
         <p id="lv-desc"></p>
       </div>
-      <div class="concept-list" id="concept-list"></div>
+      <div class="day-sections" id="day-sections"></div>
       <div class="quiz-cta-card">
         <div>
           <h3>Ready to test yourself?</h3>

@@ -45,16 +45,16 @@ a{color:inherit;}
   top:0;
   z-index:100;
 }
-.brand{display:flex;align-items:baseline;gap:8px;cursor:pointer;border-radius:8px;padding:2px 4px;margin:-2px -4px;transition:opacity .12s ease;}
+.brand{display:flex;align-items:center;gap:9px;cursor:pointer;border-radius:8px;padding:2px 4px;margin:-2px -4px;transition:opacity .12s ease;}
 .brand:hover{opacity:.75;}
 .brand-mark{
   width:30px;height:30px;border-radius:8px;
   background:var(--primary);
   display:inline-flex;align-items:center;justify-content:center;
-  color:#fff;font-family:'Fraunces',serif;font-weight:700;font-size:16px;
-  transform:translateY(4px);
+  flex-shrink:0;
 }
-.brand-name{font-family:'Fraunces',serif;font-size:21px;font-weight:600;}
+.brand-mark svg{display:block;width:16px;height:16px;}
+.brand-name{font-family:'Fraunces',serif;font-size:21px;font-weight:600;line-height:1;}
 .topbar-right{display:flex;align-items:center;gap:16px;}
 .user-chip{display:flex;align-items:center;gap:10px;font-size:14px;color:var(--ink-soft);}
 .avatar{
@@ -78,10 +78,11 @@ a{color:inherit;}
   padding:44px 40px;max-width:420px;width:100%;box-shadow:var(--shadow);
 }
 .login-mark{
-  width:44px;height:44px;border-radius:12px;background:var(--primary);color:#fff;
+  width:44px;height:44px;border-radius:12px;background:var(--primary);
   display:flex;align-items:center;justify-content:center;
-  font-family:'Fraunces',serif;font-weight:700;font-size:22px;margin-bottom:20px;
+  margin-bottom:20px;
 }
+.login-mark svg{display:block;width:22px;height:22px;}
 .login-card h1{font-size:26px;margin:0 0 8px;}
 .login-card p.sub{color:var(--ink-soft);font-size:14.5px;line-height:1.5;margin:0 0 28px;}
 label.field-label{display:block;font-size:13px;font-weight:600;color:var(--ink-soft);margin-bottom:7px;}
@@ -108,6 +109,9 @@ input.text-input:focus{outline:2px solid var(--primary);outline-offset:1px;}
 .dash-head{margin-bottom:28px;}
 .dash-head h1{font-size:28px;margin:0 0 6px;}
 .dash-head p{color:var(--ink-soft);margin:0;font-size:15px;}
+.progress-file-row{display:flex;gap:10px;flex-wrap:wrap;margin:16px 0 8px;}
+.small-btn{font-size:12.5px;padding:8px 14px;}
+.progress-file-note{font-size:12px !important;color:var(--ink-soft);line-height:1.5;max-width:560px;}
 .stat-row{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:36px;}
 .stat-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px 22px;}
 .stat-num{font-family:'Fraunces',serif;font-size:32px;font-weight:600;line-height:1;}
@@ -144,6 +148,18 @@ input.text-input:focus{outline:2px solid var(--primary);outline-offset:1px;}
 .level-header p{color:var(--ink-soft);font-size:15px;max-width:640px;line-height:1.55;margin:0;}
 
 .concept-list{display:flex;flex-direction:column;gap:12px;margin-bottom:32px;}
+.day-sections{margin-bottom:8px;}
+.day-section{margin-bottom:34px;}
+.day-header{
+  display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap;
+}
+.day-badge{
+  background:var(--primary);color:#fff;
+  font-family:'Fraunces',serif;font-weight:600;font-size:13px;
+  padding:5px 12px;border-radius:20px;flex-shrink:0;
+}
+.day-title{font-size:17px;margin:0;flex:1;min-width:120px;}
+.day-progress{font-size:12.5px;color:var(--ink-soft);white-space:nowrap;}
 .concept-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
 .concept-head{display:flex;align-items:center;justify-content:space-between;padding:18px 20px;cursor:pointer;gap:14px;}
 .concept-head-right{display:flex;align-items:center;gap:12px;flex-shrink:0;}

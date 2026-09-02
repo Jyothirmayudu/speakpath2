@@ -10,9 +10,13 @@ function storageKey(name){ return "speakpath_" + name.trim().toLowerCase(); }
 function loadProgress(name){
   const raw = localStorage.getItem(storageKey(name));
   if(raw){
-    try{ return JSON.parse(raw); }catch(e){ /* fall through */ }
+    try{
+      const p = JSON.parse(raw);
+      if(!p.quizStats) p.quizStats = {}; // upgrade older saved progress
+      return p;
+    }catch(e){ /* fall through */ }
   }
-  return { name: name, completed: [], levelScores: {}, unlocked: [1] };
+  return { name: name, completed: [], levelScores: {}, quizStats: {}, unlocked: [1] };
 }
 function saveProgress(p){
   localStorage.setItem(storageKey(p.name), JSON.stringify(p));
@@ -66,6 +70,126 @@ brandHomeBtn.addEventListener('keydown', (e) => {
 window.addEventListener('load', () => {
   const last = localStorage.getItem('speakpath_last_user');
   if(last){ document.getElementById('name-input').value = last; }
+});
+
+/* ============================================================
+   PROGRESS FILE: EXPORT / IMPORT (JSON)
+   A static, browser-only app can't write files to disk on its
+   own — there's no server. Export/Import is the honest, real
+   equivalent: a genuine JSON file you can save, hand to someone
+   else, edit by hand, and re-import to update tracked progress.
+   The exported file is organised per level, with topic titles
+   (not just IDs) and a full quiz breakdown, so it's readable and
+   editable by a human, not just the app.
+   ============================================================ */
+function buildExportPayload(){
+  return {
+    student: progress.name,
+    exportedAt: new Date().toISOString(),
+    overallConceptsCompleted: progress.completed.length,
+    overallConceptsTotal: totalConcepts(),
+    levels: LEVELS.map(level => {
+      const total = level.concepts.length;
+      const completedTopics = level.concepts.filter(c => progress.completed.includes(c.id));
+      const remainingTopics = level.concepts.filter(c => !progress.completed.includes(c.id));
+      const qStats = progress.quizStats[level.id];
+      return {
+        levelId: level.id,
+        levelTitle: level.title,
+        unlocked: progress.unlocked.includes(level.id),
+        concepts: {
+          total: total,
+          completed: completedTopics.length,
+          percentComplete: Math.round((completedTopics.length / total) * 100),
+          completedTopics: completedTopics.map(c => ({ id: c.id, title: c.title })),
+          remainingTopics: remainingTopics.map(c => ({ id: c.id, title: c.title })),
+        },
+        quiz: qStats ? {
+          attempted: true,
+          passed: qStats.scorePercent >= 70,
+          scorePercent: qStats.scorePercent,
+          questionsTotal: qStats.total,
+          correctAnswers: qStats.correct,
+          incorrectAnswers: qStats.incorrect,
+          skippedQuestions: qStats.skipped,
+          lastAttempt: qStats.lastAttempt,
+        } : {
+          attempted: false
+        }
+      };
+    })
+  };
+}
+
+document.getElementById('export-progress-btn').addEventListener('click', () => {
+  if(!progress) return;
+  const data = JSON.stringify(buildExportPayload(), null, 2);
+  const blob = new Blob([data], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `speakpath-progress-${progress.name.trim().toLowerCase().replace(/\s+/g, '-')}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+});
+
+document.getElementById('import-progress-btn').addEventListener('click', () => {
+  document.getElementById('import-file-input').click();
+});
+
+document.getElementById('import-file-input').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try{
+      const parsed = JSON.parse(reader.result);
+      const newCompleted = [];
+      const newLevelScores = {};
+      const newQuizStats = {};
+      const newUnlocked = [];
+
+      if(Array.isArray(parsed.levels)){
+        // Current rich export format: per-level breakdown with topic titles.
+        parsed.levels.forEach(lv => {
+          if(lv.unlocked) newUnlocked.push(lv.levelId);
+          const topics = (lv.concepts && lv.concepts.completedTopics) || [];
+          topics.forEach(t => { if(t && t.id) newCompleted.push(t.id); });
+          if(lv.quiz && lv.quiz.attempted){
+            newLevelScores[lv.levelId] = lv.quiz.scorePercent;
+            newQuizStats[lv.levelId] = {
+              total: lv.quiz.questionsTotal,
+              correct: lv.quiz.correctAnswers,
+              incorrect: lv.quiz.incorrectAnswers,
+              skipped: lv.quiz.skippedQuestions,
+              scorePercent: lv.quiz.scorePercent,
+              lastAttempt: lv.quiz.lastAttempt,
+            };
+          }
+        });
+      } else {
+        // Older, flatter export format — still supported.
+        if(Array.isArray(parsed.completed)) newCompleted.push(...parsed.completed);
+        Object.assign(newLevelScores, parsed.levelScores || {});
+        Object.assign(newQuizStats, parsed.quizStats || {});
+        if(Array.isArray(parsed.unlocked)) newUnlocked.push(...parsed.unlocked);
+      }
+
+      progress.completed = newCompleted;
+      progress.levelScores = newLevelScores;
+      progress.quizStats = newQuizStats;
+      progress.unlocked = newUnlocked.length ? newUnlocked : [1];
+      saveProgress(progress);
+      renderDashboard();
+      alert('Progress imported successfully for ' + progress.name + '.');
+    }catch(err){
+      alert("Couldn't read that file — please make sure it's a valid SpeakPath progress JSON file.");
+    }
+    e.target.value = '';
+  };
+  reader.readAsText(file);
 });
 
 /* ============================================================
@@ -136,70 +260,95 @@ function renderLevel(levelId){
   document.getElementById('quiz-cta-desc').textContent =
     `A ${level.quiz.length}-question quiz on everything in this level, with a full explanation for every answer afterwards. Score 70% or higher to unlock the next level.`;
 
-  const list = document.getElementById('concept-list');
-  list.innerHTML = '';
-  level.concepts.forEach(c => {
-    const done = progress.completed.includes(c.id);
-    const card = document.createElement('div');
-    card.className = 'concept-card';
-    card.dataset.conceptId = c.id;
-    card.innerHTML = `
-      <div class="concept-head">
-        <div class="concept-head-left">
-          <div class="concept-check ${done ? 'done' : ''}">${done ? '✓' : ''}</div>
-          <div class="concept-title">${wrapWordsHTML(c.title)}</div>
-        </div>
-        <div class="concept-head-right">
-          <span class="listen-slot"></span>
-          <div class="chevron">▾</div>
-        </div>
+  const conceptsById = {};
+  level.concepts.forEach(c => { conceptsById[c.id] = c; });
+
+  const container = document.getElementById('day-sections');
+  container.innerHTML = '';
+
+  (level.days || []).forEach(day => {
+    const dayConcepts = day.conceptIds.map(id => conceptsById[id]).filter(Boolean);
+    const doneInDay = dayConcepts.filter(c => progress.completed.includes(c.id)).length;
+
+    const section = document.createElement('div');
+    section.className = 'day-section';
+    section.innerHTML = `
+      <div class="day-header">
+        <span class="day-badge">Day ${day.day}</span>
+        <h3 class="day-title">${day.title}</h3>
+        <span class="day-progress">${doneInDay}/${dayConcepts.length} done</span>
       </div>
-      <div class="concept-body">
-        ${renderExplain(c.explain)}
-        <div class="example-box">
-          <div class="ex-label">${wrapWordsHTML('Examples')}</div>
-          <ul>${c.examples.map(e => `<li>${wrapWordsHTML(e)}</li>`).join('')}</ul>
-        </div>
-        <div class="tip-box">${wrapWordsHTML(c.tip)}</div>
-        ${c.source ? `<p class="source-line">Source: <a href="${c.source.url}" target="_blank" rel="noopener">${c.source.label}</a></p>` : ''}
-        <button class="btn ${done ? 'btn-ghost' : 'btn-primary'} mark-btn">${done ? 'Marked as understood' : 'Mark as understood'}</button>
-      </div>
+      <div class="concept-list"></div>
     `;
-    const head = card.querySelector('.concept-head');
-    head.addEventListener('click', () => card.classList.toggle('open'));
-
-    // Reading order: title → explanation → examples → tip (matches what's on screen).
-    const tokens = spanTokens(card);
-    const listenGroupEl = createListenGroup(null, tokens);
-    // Auto-expand the card when playback starts, so the highlighted word is visible.
-    listenGroupEl.querySelectorAll('.listen-play, .listen-restart').forEach(btn => {
-      btn.addEventListener('click', () => card.classList.add('open'));
+    const list = section.querySelector('.concept-list');
+    dayConcepts.forEach(c => {
+      list.appendChild(buildConceptCard(c, level, levelId));
     });
-    card.querySelector('.listen-slot').replaceWith(listenGroupEl);
-
-    const markBtn = card.querySelector('.mark-btn');
-    markBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      if(!progress.completed.includes(c.id)){
-        progress.completed.push(c.id);
-        saveProgress(progress);
-        const idx = level.concepts.findIndex(x => x.id === c.id);
-        const nextConcept = level.concepts[idx + 1];
-        renderLevel(levelId);
-        if(nextConcept){
-          const nextCard = document.querySelector(`[data-concept-id="${nextConcept.id}"]`);
-          if(nextCard){
-            nextCard.classList.add('open');
-            nextCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          }
-        } else {
-          const quizCta = document.querySelector('.quiz-cta-card');
-          if(quizCta) quizCta.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
-      }
-    });
-    list.appendChild(card);
+    container.appendChild(section);
   });
+}
+
+function buildConceptCard(c, level, levelId){
+  const done = progress.completed.includes(c.id);
+  const card = document.createElement('div');
+  card.className = 'concept-card';
+  card.dataset.conceptId = c.id;
+  card.innerHTML = `
+    <div class="concept-head">
+      <div class="concept-head-left">
+        <div class="concept-check ${done ? 'done' : ''}">${done ? '✓' : ''}</div>
+        <div class="concept-title">${wrapWordsHTML(c.title)}</div>
+      </div>
+      <div class="concept-head-right">
+        <span class="listen-slot"></span>
+        <div class="chevron">▾</div>
+      </div>
+    </div>
+    <div class="concept-body">
+      ${renderExplain(c.explain)}
+      <div class="example-box">
+        <div class="ex-label">${wrapWordsHTML('Examples')}</div>
+        <ul>${c.examples.map(e => `<li>${wrapWordsHTML(e)}</li>`).join('')}</ul>
+      </div>
+      <div class="tip-box">${wrapWordsHTML(c.tip)}</div>
+      ${c.source ? `<p class="source-line">Source: <a href="${c.source.url}" target="_blank" rel="noopener">${c.source.label}</a></p>` : ''}
+      <button class="btn ${done ? 'btn-ghost' : 'btn-primary'} mark-btn">${done ? 'Marked as understood' : 'Mark as understood'}</button>
+    </div>
+  `;
+  const head = card.querySelector('.concept-head');
+  head.addEventListener('click', () => card.classList.toggle('open'));
+
+  // Reading order: title → explanation → examples → tip (matches what's on screen).
+  const tokens = spanTokens(card);
+  const listenGroupEl = createListenGroup(null, tokens);
+  // Auto-expand the card when playback starts, so the highlighted word is visible.
+  listenGroupEl.querySelectorAll('.listen-play, .listen-restart').forEach(btn => {
+    btn.addEventListener('click', () => card.classList.add('open'));
+  });
+  card.querySelector('.listen-slot').replaceWith(listenGroupEl);
+
+  const markBtn = card.querySelector('.mark-btn');
+  markBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if(!progress.completed.includes(c.id)){
+      progress.completed.push(c.id);
+      saveProgress(progress);
+      const idx = level.concepts.findIndex(x => x.id === c.id);
+      const nextConcept = level.concepts[idx + 1];
+      renderLevel(levelId);
+      if(nextConcept){
+        const nextCard = document.querySelector(`[data-concept-id="${nextConcept.id}"]`);
+        if(nextCard){
+          nextCard.classList.add('open');
+          nextCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      } else {
+        const quizCta = document.querySelector('.quiz-cta-card');
+        if(quizCta) quizCta.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }
+  });
+  return card;
 }
 
 document.getElementById('start-quiz-btn').addEventListener('click', () => {
@@ -394,6 +543,18 @@ function advanceQuiz(level){
 function finishQuiz(level){
   const pct = Math.round((quizState.score / level.quiz.length) * 100);
   progress.levelScores[level.id] = pct;
+
+  const incorrectCount = quizState.answers.filter(a => !a.skipped && a.selected !== a.correctIdx).length;
+  const skippedCount = quizState.answers.filter(a => a.skipped).length;
+  progress.quizStats[level.id] = {
+    total: level.quiz.length,
+    correct: quizState.score,
+    incorrect: incorrectCount,
+    skipped: skippedCount,
+    scorePercent: pct,
+    lastAttempt: new Date().toISOString(),
+  };
+
   const passed = pct >= 70;
   if(passed){
     const nextId = level.id + 1;
