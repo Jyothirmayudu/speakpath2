@@ -53,6 +53,16 @@ document.getElementById('logout-btn').addEventListener('click', () => {
   document.getElementById('name-input').value = '';
 });
 
+// Logo/brand name always jumps back to the dashboard.
+const brandHomeBtn = document.getElementById('brand-home-btn');
+brandHomeBtn.addEventListener('click', () => { if(progress) goDashboard(); });
+brandHomeBtn.addEventListener('keydown', (e) => {
+  if((e.key === 'Enter' || e.key === ' ') && progress){
+    e.preventDefault();
+    goDashboard();
+  }
+});
+
 window.addEventListener('load', () => {
   const last = localStorage.getItem('speakpath_last_user');
   if(last){ document.getElementById('name-input').value = last; }
@@ -102,11 +112,10 @@ function renderDashboard(){
       <div class="lv-tag">LEVEL ${level.id}</div>
       <h3>${level.title}</h3>
       <p class="lv-desc">${level.desc}</p>
+      <div class="progress-label-row"><span>Concepts</span><span>${doneCount}/${level.concepts.length} (${pct}%)</span></div>
       <div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div>
-      <div class="lv-meta">
-        <span>${doneCount}/${level.concepts.length} concepts</span>
-        <span>${score !== undefined ? 'Quiz: ' + score + '%' : 'Quiz: not taken'}</span>
-      </div>
+      <div class="progress-label-row" style="margin-top:10px;"><span>Quiz</span><span>${score !== undefined ? score + '%' : 'Not taken'}</span></div>
+      <div class="progress-track"><div class="progress-fill quiz-fill" style="width:${score || 0}%"></div></div>
       <button class="btn ${locked ? 'btn-ghost' : 'btn-primary'} lv-cta" ${locked ? 'disabled' : ''}>${locked ? 'Complete previous level' : 'Open level'}</button>
     `;
     if(!locked){
@@ -133,6 +142,7 @@ function renderLevel(levelId){
     const done = progress.completed.includes(c.id);
     const card = document.createElement('div');
     card.className = 'concept-card';
+    card.dataset.conceptId = c.id;
     card.innerHTML = `
       <div class="concept-head">
         <div class="concept-head-left">
@@ -159,8 +169,8 @@ function renderLevel(levelId){
     head.addEventListener('click', () => card.classList.toggle('open'));
 
     // Reading order: title → explanation → examples → tip (matches what's on screen).
-    const wordSpans = collectWordSpans(card);
-    const listenGroupEl = createListenGroup(null, wordSpans);
+    const tokens = spanTokens(card);
+    const listenGroupEl = createListenGroup(null, tokens);
     // Auto-expand the card when playback starts, so the highlighted word is visible.
     listenGroupEl.querySelectorAll('.listen-play, .listen-restart').forEach(btn => {
       btn.addEventListener('click', () => card.classList.add('open'));
@@ -173,7 +183,19 @@ function renderLevel(levelId){
       if(!progress.completed.includes(c.id)){
         progress.completed.push(c.id);
         saveProgress(progress);
+        const idx = level.concepts.findIndex(x => x.id === c.id);
+        const nextConcept = level.concepts[idx + 1];
         renderLevel(levelId);
+        if(nextConcept){
+          const nextCard = document.querySelector(`[data-concept-id="${nextConcept.id}"]`);
+          if(nextCard){
+            nextCard.classList.add('open');
+            nextCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        } else {
+          const quizCta = document.querySelector('.quiz-cta-card');
+          if(quizCta) quizCta.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
       }
     });
     list.appendChild(card);
@@ -238,6 +260,7 @@ function renderQuestion(level){
 
   document.getElementById('quiz-progress-label').textContent = `Question ${quizState.qIndex + 1} of ${level.quiz.length}`;
   document.getElementById('quiz-progress-fill').style.width = `${(quizState.qIndex / level.quiz.length) * 100}%`;
+  document.getElementById('q-number-badge').textContent = `Q${quizState.qIndex + 1}`;
   document.getElementById('q-text').innerHTML = wrapWordsHTML(q.q);
 
   const optList = document.getElementById('opt-list');
@@ -251,21 +274,68 @@ function renderQuestion(level){
     optList.appendChild(btn);
   });
 
-  // Listen group reads the question, then each option, highlighting words as it goes.
+  // Listen group: "Question number N. <question text> Option A. <opt> Option B. <opt> ..."
+  // "Question number N" and "Option X" are spoken but have no on-screen span of
+  // their own (the number/letter are already shown visually elsewhere), so they
+  // don't get highlighted — only the real question and option words do.
   const questionSlot = document.getElementById('question-listen-slot');
   questionSlot.innerHTML = '';
-  const qWordSpans = [
-    ...collectWordSpans(document.getElementById('q-text')),
-    ...collectWordSpans(optList)
+  let qTokens = [
+    ...textTokens(`Question number ${quizState.qIndex + 1}.`),
+    ...spanTokens(document.getElementById('q-text'))
   ];
-  questionSlot.appendChild(createListenGroup(null, qWordSpans));
+  optList.querySelectorAll('.opt-btn').forEach((btn, idx) => {
+    qTokens = qTokens.concat(textTokens(`Option ${letters[idx]}.`), spanTokens(btn));
+  });
+  questionSlot.appendChild(createListenGroup(null, qTokens));
 
   document.getElementById('feedback-box').classList.add('hidden');
   document.getElementById('feedback-box').innerHTML = '';
+
+  // Hint: reset per question — shown on demand, one click each.
+  const hintBtn = document.getElementById('quiz-hint-btn');
+  const hintBox = document.getElementById('hint-box');
+  hintBox.classList.add('hidden');
+  hintBox.innerHTML = '';
+  hintBtn.disabled = false;
+  hintBtn.textContent = '💡 Hint';
+  hintBtn.onclick = () => {
+    if(q.hint){
+      hintBox.innerHTML = `<span class="hint-text">${wrapWordsHTML(q.hint)}</span><span class="listen-slot"></span>`;
+      const hintTokens = spanTokens(hintBox.querySelector('.hint-text').parentElement);
+      hintBox.querySelector('.listen-slot').replaceWith(createListenGroup(null, hintTokens));
+      hintBox.classList.remove('hidden');
+    }
+    hintBtn.disabled = true;
+    hintBtn.textContent = '💡 Hint used';
+  };
+  hintBtn.classList.toggle('hidden', !q.hint);
+
+  // Skip: only available before the question has been answered.
+  const skipBtn = document.getElementById('quiz-skip-btn');
+  skipBtn.classList.remove('hidden');
+  skipBtn.onclick = () => skipQuestion(level);
+
   const nextBtn = document.getElementById('quiz-next-btn');
   nextBtn.textContent = 'Check answer';
   nextBtn.disabled = true;
   nextBtn.onclick = () => checkAnswer(level);
+}
+
+function skipQuestion(level){
+  if(quizState.answered) return;
+  const q = level.quiz[quizState.qIndex];
+  quizState.answered = true;
+  quizState.answers.push({
+    question: q.q,
+    opts: q.opts,
+    selected: null,
+    correctIdx: q.a,
+    explain: q.explain,
+    skipped: true
+  });
+  document.getElementById('quiz-skip-btn').classList.add('hidden');
+  advanceQuiz(level);
 }
 
 function selectOption(idx){
@@ -281,6 +351,7 @@ function checkAnswer(level){
   const q = level.quiz[quizState.qIndex];
   if(quizState.answered) return;
   quizState.answered = true;
+  document.getElementById('quiz-skip-btn').classList.add('hidden');
   const correct = quizState.selected === q.a;
   if(correct) quizState.score++;
 
@@ -303,7 +374,7 @@ function checkAnswer(level){
   fb.className = 'feedback-box ' + (correct ? 'correct' : 'incorrect');
   const feedbackText = `${correct ? "That's right. " : `Not quite — the correct answer is "${q.opts[q.a]}". `}${q.explain}`;
   fb.innerHTML = `<span class="feedback-text">${wrapWordsHTML(feedbackText)}</span>`;
-  fb.appendChild(createListenGroup(null, collectWordSpans(fb)));
+  fb.appendChild(createListenGroup(null, spanTokens(fb)));
 
   const nextBtn = document.getElementById('quiz-next-btn');
   nextBtn.textContent = quizState.qIndex < level.quiz.length - 1 ? 'Next question' : 'See results';
@@ -346,28 +417,51 @@ function finishQuiz(level){
   const reviewList = document.getElementById('review-list');
   reviewList.innerHTML = '';
   quizState.answers.forEach((ans, i) => {
-    const wasCorrect = ans.selected === ans.correctIdx;
+    const wasCorrect = !ans.skipped && ans.selected === ans.correctIdx;
     const item = document.createElement('div');
     item.className = 'review-item';
     item.innerHTML = `
       <div class="review-item-head">
         <p class="review-q"><span class="review-q-num">Q${i + 1}.</span> ${ans.question}</p>
       </div>
-      ${wasCorrect
-        ? `<div class="review-answer-line right">✓ You answered: ${ans.opts[ans.selected]}</div>`
-        : `<div class="review-answer-line wrong">✗ You answered: ${ans.opts[ans.selected]}</div>
-           <div class="review-answer-line right">✓ Correct answer: ${ans.opts[ans.correctIdx]}</div>`
+      ${ans.skipped
+        ? `<div class="review-answer-line">⏭ Skipped — correct answer: ${ans.opts[ans.correctIdx]}</div>`
+        : wasCorrect
+          ? `<div class="review-answer-line right">✓ You answered: ${ans.opts[ans.selected]}</div>`
+          : `<div class="review-answer-line wrong">✗ You answered: ${ans.opts[ans.selected]}</div>
+             <div class="review-answer-line right">✓ Correct answer: ${ans.opts[ans.correctIdx]}</div>`
       }
       <div class="review-explain">
         <span class="review-explain-text">${wrapWordsHTML(ans.explain)}</span>
         <span class="listen-slot"></span>
       </div>
     `;
-    const explainSpans = collectWordSpans(item.querySelector('.review-explain-text').parentElement);
-    item.querySelector('.listen-slot').replaceWith(createListenGroup(null, explainSpans));
+    const explainTokens = spanTokens(item.querySelector('.review-explain-text').parentElement);
+    item.querySelector('.listen-slot').replaceWith(createListenGroup(null, explainTokens));
     reviewList.appendChild(item);
   });
 
   showView('view-results');
   if(passed){ launchCelebration(); }
 }
+
+/* ============================================================
+   GO-TO-TOP BUTTON
+   ============================================================ */
+(function setUpGotoTop(){
+  const btn = document.createElement('button');
+  btn.id = 'goto-top-btn';
+  btn.type = 'button';
+  btn.title = 'Back to top';
+  btn.setAttribute('aria-label', 'Back to top');
+  btn.textContent = '↑';
+  document.body.appendChild(btn);
+
+  btn.addEventListener('click', () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+
+  window.addEventListener('scroll', () => {
+    btn.classList.toggle('visible', window.scrollY > 400);
+  });
+})();

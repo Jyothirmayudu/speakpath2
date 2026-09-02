@@ -12,6 +12,7 @@
    ============================================================ */
 
 let activeListenGroup = null;
+let pendingSpeakTimer = null;
 
 function resetListenGroup(group){
   group.classList.remove('active');
@@ -26,30 +27,48 @@ function clearHighlight(group){
     group._currentWordSpan.classList.remove('current-word');
     group._currentWordSpan = null;
   }
+  if(group._currentOptBtn){
+    group._currentOptBtn.classList.remove('reading-active');
+    group._currentOptBtn = null;
+  }
 }
 
+// tokens: ordered array of {text, span} — span is null for spoken-only
+// connector words (e.g. "Question number 1.") that have no on-screen
+// counterpart, so they're spoken but simply produce no highlight.
 function highlightWordAt(group, absoluteIndex){
-  if(!group._wordSpans || !group._wordStarts || !group._wordSpans.length) return;
-  const starts = group._wordStarts;
+  if(!group._tokens || !group._tokenStarts || !group._tokens.length) return;
+  const starts = group._tokenStarts;
   let lo = 0, hi = starts.length - 1, ans = 0;
   while(lo <= hi){
     const mid = (lo + hi) >> 1;
     if(starts[mid] <= absoluteIndex){ ans = mid; lo = mid + 1; }
     else{ hi = mid - 1; }
   }
-  const span = group._wordSpans[ans];
+  const span = group._tokens[ans].span;
   if(span === group._currentWordSpan) return;
   clearHighlight(group);
   if(span){
     span.classList.add('current-word');
     group._currentWordSpan = span;
     span.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+
+    // If this word lives inside a quiz option button, highlight the
+    // whole option so it's obvious which answer is being read, not
+    // just the single word.
+    const optBtn = span.closest ? span.closest('.opt-btn') : null;
+    if(optBtn !== group._currentOptBtn){
+      if(group._currentOptBtn) group._currentOptBtn.classList.remove('reading-active');
+      if(optBtn) optBtn.classList.add('reading-active');
+      group._currentOptBtn = optBtn;
+    }
   }
 }
 
 function resetAllListenGroups(){
   document.querySelectorAll('.listen-group').forEach(resetListenGroup);
   activeListenGroup = null;
+  if(pendingSpeakTimer){ clearTimeout(pendingSpeakTimer); pendingSpeakTimer = null; }
 }
 
 function setGroupProgress(group, fraction){
@@ -106,7 +125,12 @@ function beginSpeaking(group, charOffset){
   playBtn.title = 'Pause';
   setGroupProgress(group, charOffset / fullText.length);
 
-  window.speechSynthesis.speak(utter);
+  // Chrome/Edge sometimes clip the very first word if speak() fires
+  // immediately after cancel() — a short delay reliably avoids it.
+  pendingSpeakTimer = setTimeout(() => {
+    pendingSpeakTimer = null;
+    window.speechSynthesis.speak(utter);
+  }, 120);
 }
 
 function seekGroupToFraction(group, fraction){
@@ -132,28 +156,37 @@ function wrapWordsHTML(text){
 function collectWordSpans(container){
   return Array.from(container.querySelectorAll('.word'));
 }
+// Tokens from real on-screen .word spans — each is spoken AND highlighted.
+function spanTokens(container){
+  return collectWordSpans(container).map(span => ({ text: span.textContent, span }));
+}
+// Tokens for a spoken-only connector phrase (e.g. "Question number 1.")
+// that has no on-screen span of its own — spoken, but never highlighted.
+function textTokens(str){
+  return String(str).split(/\s+/).filter(Boolean).map(w => ({ text: w, span: null }));
+}
 
 /* Builds a play/pause + seek-bar + restart + stop control cluster.
-   - text: the plain text to speak (used when wordSpans is omitted)
-   - wordSpans: optional ordered array of .word <span> elements
-     already in the DOM; when given, the group re-derives its exact
-     speech text from these spans (guaranteeing the highlighted word
-     always matches what's being spoken) and highlights each one in
-     turn as it's read aloud. */
-function createListenGroup(text, wordSpans){
+   - text: plain text to speak (used only when tokens is omitted)
+   - tokens: optional ordered array of {text, span} — build with
+     spanTokens()/textTokens() and concatenate as needed. When given,
+     the group re-derives its exact speech text from these tokens
+     (guaranteeing the highlighted word always matches what's being
+     spoken) and highlights each token's span (if any) in turn. */
+function createListenGroup(text, tokens){
   const group = document.createElement('span');
   group.className = 'listen-group';
 
-  if(wordSpans && wordSpans.length){
-    group._wordSpans = wordSpans;
-    group._text = wordSpans.map(s => s.textContent).join(' ');
+  if(tokens && tokens.length){
+    group._tokens = tokens;
+    group._text = tokens.map(t => t.text).join(' ');
     const starts = [];
     let offset = 0;
-    wordSpans.forEach(span => {
+    tokens.forEach(t => {
       starts.push(offset);
-      offset += span.textContent.length + 1;
+      offset += t.text.length + 1;
     });
-    group._wordStarts = starts;
+    group._tokenStarts = starts;
   } else {
     group._text = text;
   }

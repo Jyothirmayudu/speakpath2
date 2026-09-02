@@ -27,7 +27,7 @@
 <!-- ===================== APP SHELL (everything after login) ===================== -->
 <div id="app-shell" class="hidden">
   <div class="topbar">
-    <div class="brand">
+    <div class="brand" id="brand-home-btn" role="button" tabindex="0" title="Go to dashboard">
       <span class="brand-mark">S</span>
       <span class="brand-name">SpeakPath</span>
     </div>
@@ -51,7 +51,7 @@
 
       <div class="stat-row">
         <div class="stat-card">
-          <div class="stat-num" id="stat-concepts">0/28</div>
+          <div class="stat-num" id="stat-concepts">0/80</div>
           <div class="stat-label">Concepts covered so far</div>
         </div>
         <div class="stat-card">
@@ -100,12 +100,20 @@
         </div>
         <div class="q-card">
           <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:22px;flex-wrap:wrap;">
-            <p class="q-text" id="q-text"></p>
+            <div style="display:flex;align-items:flex-start;gap:12px;min-width:0;">
+              <span class="q-number-badge" id="q-number-badge">Q1</span>
+              <p class="q-text" id="q-text"></p>
+            </div>
             <span id="question-listen-slot"></span>
           </div>
           <div class="opt-list" id="opt-list"></div>
+          <div class="hint-row">
+            <button class="btn btn-ghost hint-btn" id="quiz-hint-btn" type="button">💡 Hint</button>
+          </div>
+          <div class="hint-box hidden" id="hint-box"></div>
           <div class="feedback-box hidden" id="feedback-box"></div>
           <div class="quiz-actions">
+            <button class="btn btn-ghost" id="quiz-skip-btn" type="button">Skip question</button>
             <button class="btn btn-primary" id="quiz-next-btn" disabled>Check answer</button>
           </div>
         </div>
